@@ -20,6 +20,7 @@ from pyecharts.commons.utils import JsCode
 
 import BD_server
 import DataPlot
+import DataPlot2
 
 # 设置起始序号和间隔时间
 start_index = 1
@@ -57,6 +58,8 @@ def set_data(table, data):
             table.setItem(row, 0, key_item)
             table.setItem(row, 1, value_item)
             row += 1
+
+    table.setFont(font)  # 设置表格的字体
 
 
 gauge = None
@@ -135,11 +138,11 @@ def clearLog():
 
 ori_data = {
     'UV Sensor Data': {'Vout': '107', 'UV': '1'},
-    'Humidity and Temperature Sensor Data': {'Humidity': '31.10', 'Temperature': '29.90', 'Heat Index Celsius': '28.74',
+    'Humidity and Temperature Sensor Data': {'Humidity': '50.10', 'Temperature': '29.90', 'Heat Index Celsius': '28.74',
                                              'Heat Index Fahrenheit': '83.73'},
     'Gas Sensor Data': {'PPM': '1.50'},
     'Soil Sensor Data': {'Moisture': '1014', 'State': '1'},
-    'BMP Sensor Data': {'Temperature': '26.28', 'Pressure': '99947.13', 'Altitude': '115.36'},
+    'BMP Sensor Data': {'Temperature': '30.30', 'Pressure': '99947.13', 'Altitude': '115.36'},
     'Rain Sensor Data': {'Rain': '231', 'State': '1'},
     'Water Sensor Data': {'Liquid Flow Rate': '0.00', 'Total Liquid Quantity': '0.00'},
     'Wind Sensor Data': {'Wind Speed': '0.00', 'Real Speed': '0.00', 'Power': '0.00', 'Power Normalized': '0.00'},
@@ -164,8 +167,8 @@ if __name__ == '__main__':
     table.setColumnCount(2)
     table.setHorizontalHeaderLabels(["Key", "Value"])
     # 设置表格文字大小
-    font = QFont()
-    font.setPointSize(18)  # 设置字号为12
+    font = QFont("Microsoft YaHei",12,12)
+    # font.setPointSize(30)  # 设置字号为12
     table.setFont(font)  # 设置表格的字体
     # table.setMinimumSize(600, 1600)
     table.setColumnWidth(0, 600)
@@ -227,10 +230,16 @@ if __name__ == '__main__':
     frame1_2_layout1 = QVBoxLayout()
     frame1_2_layout1.addWidget(w2)
     frame1_2.setLayout(frame1_2_layout1)
+    # 添加多子图
+    frame1_3_layout = QVBoxLayout()
+    plot2 = DataPlot2.SensorPlot()
+    frame1_3_layout.addWidget(plot2)
+    frame1_3.setLayout(frame1_3_layout)
 
     # 创建一个垂直布局，并将表格添加到布局中
     layout1 = QVBoxLayout()
     layout1.addWidget(table)
+    # layout1.addWidget(table, 1, alignment=QtCore.Qt.AlignCenter)
     # 将垂直布局设置为frame的布局
     frame.setLayout(layout1)
 
@@ -293,6 +302,10 @@ if __name__ == '__main__':
 
             time.sleep(1)
 
+    def updateSensorPlot():
+        while True:
+            plot2.updateData(dir_data)
+            time.sleep(1)
 
     # 线程1：获取数据的线程
     class DataThread(QThread):
@@ -309,13 +322,14 @@ if __name__ == '__main__':
                 try:
                     dir_data = BD_server.get_data(start_index, interval, driver)
                 except:
-                    print("未找到元素")
+                    # print("未找到元素")
                     if logState:
-                        logText.append(current_time + ':未找到元素!')
-                    start_index -= 1
+                        logText.append(current_time + ':正在获取数据...')
+                    if start_index > 1:
+                        start_index -= 1
                 else:
                     if logState:
-                        logText.append(current_time + ':成功找到元素！！!')
+                        logText.append(current_time + ':成功获取到数据！！!')
                     # 获取经纬度信息
                     g = geocoder.ip('me')
                     latitude = g.latlng[0]
@@ -332,7 +346,7 @@ if __name__ == '__main__':
 
                 set_data(table, dir_data)
                 # 可以在此添加适当的延时
-                time.sleep(1)
+                time.sleep(0.3)
 
 
     driverThread = threading.Thread(target=startDriver)
@@ -342,6 +356,9 @@ if __name__ == '__main__':
     updateUVThread = threading.Thread(target=update_gauge)
     myThread = DataThread()
     myThread.start()
+    # plot2更新
+    SensorThread = threading.Thread(target=updateSensorPlot)
+    SensorThread.start()
 
     # def update_table_data():
     #     global start_index

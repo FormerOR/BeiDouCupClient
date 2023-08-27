@@ -99,6 +99,7 @@ def start_web():
 def get_data(start_index, interval, driver):
     # 持续爬取数据
     # 构建XPath路径
+    # print(start_index)
     data_xpath = f'//*[@id="receiveWindow"]/div[{start_index}]/div'
 
     # 获取数据
@@ -131,7 +132,7 @@ def get_data(start_index, interval, driver):
         dir_data = parse_data(ascii_data)
 
         # 等待指定时间
-        time.sleep(interval)
+        # time.sleep(interval)
 
     return dir_data
 
