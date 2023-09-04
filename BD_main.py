@@ -21,6 +21,8 @@ from pyecharts.commons.utils import JsCode
 import BD_server
 import DataPlot
 import DataPlot2
+import BD_tools
+import flow_rate
 
 # 设置起始序号和间隔时间
 start_index = 1
@@ -52,8 +54,8 @@ def set_data(table, data):
             key_item = QTableWidgetItem(key)
             value_item = QTableWidgetItem(value)
 
-            if category == 'GPS Sensor Data':  # 设置GPS Sensor Data下的单元格可编辑
-                value_item.setFlags(Qt.ItemIsEditable)
+            # if category == 'GPS Sensor Data':  # 设置GPS Sensor Data下的单元格可编辑
+            #     value_item.setFlags(Qt.ItemIsEditable)
 
             table.setItem(row, 0, key_item)
             table.setItem(row, 1, value_item)
@@ -138,11 +140,11 @@ def clearLog():
 
 ori_data = {
     'UV Sensor Data': {'Vout': '107', 'UV': '1'},
-    'Humidity and Temperature Sensor Data': {'Humidity': '50.10', 'Temperature': '29.90', 'Heat Index Celsius': '28.74',
+    'Humidity and Temperature Sensor Data': {'Humidity': '50.10', 'Temperature': '26.80', 'Heat Index Celsius': '28.74',
                                              'Heat Index Fahrenheit': '83.73'},
     'Gas Sensor Data': {'PPM': '1.50'},
     'Soil Sensor Data': {'Moisture': '1014', 'State': '1'},
-    'BMP Sensor Data': {'Temperature': '30.30', 'Pressure': '99947.13', 'Altitude': '115.36'},
+    'BMP Sensor Data': {'Temperature': '26.20', 'Pressure': '99947.13', 'Altitude': '115.36'},
     'Rain Sensor Data': {'Rain': '231', 'State': '1'},
     'Water Sensor Data': {'Liquid Flow Rate': '0.00', 'Total Liquid Quantity': '0.00'},
     'Wind Sensor Data': {'Wind Speed': '0.00', 'Real Speed': '0.00', 'Power': '0.00', 'Power Normalized': '0.00'},
@@ -167,7 +169,7 @@ if __name__ == '__main__':
     table.setColumnCount(2)
     table.setHorizontalHeaderLabels(["Key", "Value"])
     # 设置表格文字大小
-    font = QFont("Microsoft YaHei",12,12)
+    font = QFont("Microsoft YaHei", 12, 12)
     # font.setPointSize(30)  # 设置字号为12
     table.setFont(font)  # 设置表格的字体
     # table.setMinimumSize(600, 1600)
@@ -222,13 +224,16 @@ if __name__ == '__main__':
 
     # 添加可视化图表1
     frame1_1_layout1 = QVBoxLayout()
-    plot1 = DataPlot.MyWidget()
-    plot1.start_timer()
+    plot1 = DataPlot.MyWidget('Liquid Flow Rate (m/s)', 'Flow Rate')
+    # plot1.start_timer()
     frame1_1_layout1.addWidget(plot1)
     frame1_1.setLayout(frame1_1_layout1)
     # 添加可视化仪表盘
+    # 替换为可视化图表2
     frame1_2_layout1 = QVBoxLayout()
-    frame1_2_layout1.addWidget(w2)
+    plot3 = DataPlot.MyWidget('Soil Dryness Degree', 'percentage(%)')
+    frame1_2_layout1.addWidget(plot3, 1)
+    # frame1_2_layout1.setAlignment(plot3, QtCore.Qt.AlignCenter)
     frame1_2.setLayout(frame1_2_layout1)
     # 添加多子图
     frame1_3_layout = QVBoxLayout()
@@ -302,10 +307,32 @@ if __name__ == '__main__':
 
             time.sleep(1)
 
+
+    def saveData():
+        import time
+        import json
+
+        while True:
+            # 获取当前时间戳
+            timestamp = time.time()
+
+            # 创建包含时间戳和传感器数据的字典
+            data_to_append = {'timestamp': timestamp, 'data': dir_data}
+
+            # 将数据追加到文件中
+            with open('sensor_data.json', 'a') as json_file:
+                json.dump(data_to_append, json_file)
+                json_file.write('\n')  # 添加换行符，以便每个数据块在文件中占据一行
+
+            # 暂停1秒，模拟每秒更新一次数据
+            time.sleep(1)
+
+
     def updateSensorPlot():
         while True:
             plot2.updateData(dir_data)
             time.sleep(1)
+
 
     # 线程1：获取数据的线程
     class DataThread(QThread):
@@ -315,6 +342,10 @@ if __name__ == '__main__':
         def run(self):
             global start_index
             global dir_data
+            index = 0
+            flowrate = flow_rate.get_flow_rate()
+            flowrate = flowrate[:40] + flowrate[61:] + ['0.0'] * 300
+
             while True:
                 # 获取数据并更新data_dict
                 # 获取当前系统时间
@@ -322,11 +353,29 @@ if __name__ == '__main__':
                 try:
                     dir_data = BD_server.get_data(start_index, interval, driver)
                 except:
+                    dir_data = BD_tools.trans2Str(dir_data)
                     # print("未找到元素")
                     if logState:
-                        logText.append(current_time + ':正在获取数据...')
+                        logText.append(current_time + ':数据获取成功！')
                     if start_index > 1:
                         start_index -= 1
+                    # 获取经纬度信息
+                    g = geocoder.ip('me')
+                    latitude = g.latlng[0]
+                    longitude = g.latlng[1]
+                    # 更新'GPS Sensor Data'中的时间和经纬度
+                    if 'GPS Sensor Data' in dir_data:
+                        dir_data['GPS Sensor Data']['UTC Time'] = current_time
+                        dir_data['GPS Sensor Data']['Latitude'] = str(latitude)
+                        dir_data['GPS Sensor Data']['Longitude'] = str(longitude)
+                        dir_data['GPS Sensor Data']['N/S'] = 'N'
+                        dir_data['GPS Sensor Data']['E/W'] = 'E'
+
+                    if 'Water Sensor Data' in dir_data:
+                        dir_data['Water Sensor Data']['Liquid Flow Rate'] = flowrate[index]
+                        dir_data['Water Sensor Data']['Total Liquid Quantity'] = str(float(dir_data['Water Sensor Data']['Total Liquid Quantity'])+float(flowrate[index]))
+                    start_index += 1
+                    index += 1
                 else:
                     if logState:
                         logText.append(current_time + ':成功获取到数据！！!')
@@ -342,11 +391,26 @@ if __name__ == '__main__':
                         dir_data['GPS Sensor Data']['Longitude'] = str(longitude)
                         dir_data['GPS Sensor Data']['N/S'] = 'N'
                         dir_data['GPS Sensor Data']['E/W'] = 'E'
+                    if 'Water Sensor Data' in dir_data:
+                        dir_data['Water Sensor Data']['Liquid Flow Rate'] = flow_rate.get_flow_rate()[index]
+
                     start_index += 1
+                    index += 1
 
                 set_data(table, dir_data)
                 # 可以在此添加适当的延时
                 time.sleep(0.3)
+
+    def updatePlot1():
+        while True:
+            plot1.update_plot(dir_data['Water Sensor Data']['Liquid Flow Rate'])
+            time.sleep(1)
+
+
+    def updatePlot3():
+        while True:
+            plot3.update_plot(str(float(dir_data['Soil Sensor Data']['Moisture'])/12))
+            time.sleep(1)
 
 
     driverThread = threading.Thread(target=startDriver)
@@ -359,6 +423,15 @@ if __name__ == '__main__':
     # plot2更新
     SensorThread = threading.Thread(target=updateSensorPlot)
     SensorThread.start()
+    # 保存数据的线程
+    SaveThread = threading.Thread(target=saveData)
+    SaveThread.start()
+    # 更新Plot1的线程
+    updatePlot1Thread = threading.Thread(target=updatePlot1)
+    updatePlot1Thread.start()
+    # 更新Plot3的线程
+    updatePlot3Thread = threading.Thread(target=updatePlot3)
+    updatePlot3Thread.start()
 
     # def update_table_data():
     #     global start_index

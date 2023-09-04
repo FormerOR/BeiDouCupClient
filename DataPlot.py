@@ -12,7 +12,7 @@ from matplotlib.figure import Figure
 start_time = time.time()
 
 class RealTimePlot(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, titleText, labelText, parent=None):
         super().__init__(parent)
 
         self.fig = Figure(figsize=(6, 4))  # 设置合适的大小
@@ -20,11 +20,11 @@ class RealTimePlot(QWidget):
         self.canvas = FigureCanvas(self.fig)
 
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_title('UV Sensor Data', color='#E1E1E1')
+        self.ax.set_title(titleText, color='#E1E1E1')
         self.ax.set_xlabel('Time', color='#E1E1E1')
         self.ax.set_ylabel('Value', color='#E1E1E1')
         self.ax.set_facecolor('#1E1E1E')  # 设置背景颜色
-        self.line_vout, = self.ax.plot([], [], label='Vout', color='#FFFF60')
+        self.line_vout, = self.ax.plot([], [], label=labelText, color='#FFFF60')
         # self.line_uv, = self.ax.plot([], [], label='UV')
         self.ax.legend()
 
@@ -51,7 +51,7 @@ class RealTimePlot(QWidget):
         # self.fig.tight_layout()
 
 class MyWidget(QWidget):
-    def __init__(self):
+    def __init__(self, titleText, labelText):
         super().__init__()
 
         self.frame = QFrame()
@@ -61,7 +61,7 @@ class MyWidget(QWidget):
         layout.addWidget(self.frame)
         self.setLayout(layout)
 
-        self.real_time_plot = RealTimePlot(self.frame)
+        self.real_time_plot = RealTimePlot(titleText, labelText, self.frame)
 
         self.timer = None
 
@@ -69,9 +69,9 @@ class MyWidget(QWidget):
         if not self.timer:
             self.timer = FuncAnimation(self.real_time_plot.fig, self.update_plot, interval=1000)
 
-    def update_plot(self, i):
+    def update_plot(self, value):
         # Simulate UV Sensor Data update
-        vout = random.randint(100, 120)
+        vout = float(value)
         uv = random.randint(0, 10)
         # 在某个时刻获取当前时间戳
         current_time = time.time()

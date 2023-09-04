@@ -21,5 +21,6 @@ plt.show(block=False)
 while True:
     uv_index = random.uniform(0, 10)  # 模拟获取UV指数数据
     gauge.set_value(uv_index)
+    fig.canvas.draw()
     time.sleep(1)
     plt.pause(0.01)
